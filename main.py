@@ -23,6 +23,7 @@ class BookUpdate(SQLModel):
     language: str | None = None
 
 
+# "postgresql://nikita:kisame2kisame@localhost:5432/book_db"
 sql_file_name = "book_database.db"
 sql_url = f"sqlite:///{sql_file_name}"
 
