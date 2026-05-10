@@ -10,21 +10,10 @@ from pwdlib import PasswordHash
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-password_hash = PasswordHash.recommended()
-
-DUMMY_HASH = password_hash.hash("dummypasword")
-# "postgresql://nikita:kisame2kisame@localhost:5432/user_db"
-sql_file_name = "user_database.db"
-sql_url = f"sqlite:///{sql_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sql_url, connect_args=connect_args)
-
 
 class Setting(BaseSettings):
     key: str
+    sql_url: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
@@ -32,6 +21,14 @@ class Setting(BaseSettings):
 
 
 setting = Setting()  # type: ignore
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+password_hash = PasswordHash.recommended()
+
+DUMMY_HASH = password_hash.hash("dummypasword")
+
+engine = create_engine(setting.sql_url)
 
 
 class User(SQLModel):

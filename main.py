@@ -2,9 +2,19 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 from .register import reg
+
+
+class Setting(BaseSettings):
+    sql_url: str
+
+    model_config = SettingsConfigDict(env_file=".env")
+
+
+setting = Setting()  # type: ignore
 
 
 class BookBase(SQLModel):
@@ -23,12 +33,7 @@ class BookUpdate(SQLModel):
     language: str | None = None
 
 
-# "postgresql://nikita:kisame2kisame@localhost:5432/book_db"
-sql_file_name = "book_database.db"
-sql_url = f"sqlite:///{sql_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sql_url, connect_args=connect_args)
+engine = create_engine(setting.sql_url)
 
 
 def create_db():
