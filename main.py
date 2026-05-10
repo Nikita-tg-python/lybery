@@ -1,69 +1,109 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Query
+from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 from .register import reg
 
-app = FastAPI()
 
-book_db = {}
+class BookBase(SQLModel):
+    book: str = Field(index=True)
+    author: str = Field(default="Nikita", index=True)
+    language: str = Field(default="English", index=True)
+
+
+class Book(BookBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+
+class BookUpdate(SQLModel):
+    book: str | None = None
+    author: str | None = None
+    language: str | None = None
+
+
+sql_file_name = "book_database.db"
+sql_url = f"sqlite:///{sql_file_name}"
+
+connect_args = {"check_same_thread": False}
+engine = create_engine(sql_url, connect_args=connect_args)
+
+
+def create_db():
+    SQLModel.metadata.create_all(engine)
+
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
 app.include_router(reg)
 
 
-class Item(BaseModel):
-    book: str | None = None
-    author: str = "Nikita"
-    num_book: int = 1
-    lenguage: str = "English"
-
-
 @app.get("/books")
-def books():
-    return list(book_db.values())
+def books(
+    session: SessionDep,
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 100,
+):
+    books = session.exec(select(Book).offset(offset).limit(limit)).all()
+    return books
 
 
-@app.get("/book/{book_name}")
-def one_book(book_name: str) -> Item:
-    if book_name not in book_db:
+@app.get("/book/{book_id}")
+def one_book(book_id: int, session: SessionDep):
+    book = session.get(Book, book_id)
+    if not book:
         raise HTTPException(
             status_code=404, detail="Enter name athere book this book not in db"
         )
-    return book_db[book_name]
+    return book
 
 
 @app.post("/book/add/")
-def add_book(item: Item):
-    if item.book in book_db:
-        raise HTTPException(status_code=404, detail="This book already exists")
-    else:
-        book_db[item.book] = {
-            "book": item.book,
-            "author": item.author,
-            "num_book": item.num_book,
-            "lenguage": item.lenguage,
-        }
-        return "book add"
+def add_book(book: BookBase, session: SessionDep):
+    db_book = Book.model_validate(book)
+    session.add(db_book)
+    session.commit()
+    session.refresh(db_book)
+    return db_book
 
 
-@app.delete("/book/{book_name}")
-def delete_book(book_name: str):
-    if book_name not in book_db:
+@app.delete("/book/{book_id}")
+def delete_book(book_id: int, session: SessionDep):
+    book = session.get(Book, book_id)
+    if not book:
         raise HTTPException(
             status_code=404, detail="Enter name another book this book not in db"
         )
-    book_db.pop(book_name)
-    return "Book delete"
+    session.delete(book)
+    session.commit()
+    return {"Book delete": True}
 
 
-@app.patch("/book/{book_name}")
-def patch_book(book_name: str, item: Item):
-    if book_name not in book_db:
+@app.patch("/book/{book_id}")
+def patch_book(book_id: int, book: BookUpdate, session: SessionDep):
+    book_db = session.get(Book, book_id)
+    if not book_db:
         raise HTTPException(
             status_code=404, detail="Enter name another book this book not in db"
         )
-    stored_book = book_db[book_name]
-    stored_book_model = Item(**stored_book)
-    update_book = item.model_dump(exclude_unset=True)
-    updata_item = stored_book_model.model_copy(update=update_book)
-    book_db[book_name] = jsonable_encoder(updata_item)
-    return updata_item
+    book_data = book.model_dump(exclude_unset=True)
+    book_db.sqlmodel_update(book_data)
+    session.add(book_db)
+    session.commit()
+    session.refresh(book_db)
+    return book_db
