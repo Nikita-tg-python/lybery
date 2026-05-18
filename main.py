@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-from .register import reg
+from register import reg
 
 
 class Setting(BaseSettings):
