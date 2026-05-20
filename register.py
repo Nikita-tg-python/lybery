@@ -31,6 +31,15 @@ DUMMY_HASH = password_hash.hash("dummypasword")
 engine = create_engine(setting.sql_url)
 
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+password_hash = PasswordHash.recommended()
+
+DUMMY_HASH = password_hash.hash("dummypasword")
+
+engine = create_engine(setting.sql_url)
+
+
 class User(SQLModel):
     username: str = Field(unique=True, index=True)
     email: str | None = Field(default=None, index=True)
@@ -123,7 +132,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoder_jwt
 
 
-async def get_current_user(
+def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep
 ):
     creditials_exeption = HTTPException(
@@ -148,7 +157,7 @@ async def get_current_user(
 
 
 @reg.post("/login")
-async def login(
+def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
 ):
     user_dict = authenticate_user(
