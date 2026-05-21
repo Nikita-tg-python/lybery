@@ -13,7 +13,8 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 class Setting(BaseSettings):
     key: str
-    sql_url: str
+    db: str
+    postgres_password: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
@@ -28,7 +29,7 @@ password_hash = PasswordHash.recommended()
 
 DUMMY_HASH = password_hash.hash("dummypasword")
 
-engine = create_engine(setting.sql_url)
+engine = create_engine(setting.db)
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -37,7 +38,7 @@ password_hash = PasswordHash.recommended()
 
 DUMMY_HASH = password_hash.hash("dummypasword")
 
-engine = create_engine(setting.sql_url)
+engine = create_engine(setting.db)
 
 
 class User(SQLModel):

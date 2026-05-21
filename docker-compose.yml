@@ -1,27 +1,43 @@
 services:
   db:
     image: postgres:15-alpine 
-    container_name: lybary_db
+    container_name: library_db
     restart: always
     environment:
+<<<<<<< HEAD
       POSTGRES_USER: nikita         # Замени на свой логин
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Замени на свой пароль
       POSTGRES_DB: lybary_db        # Название твоей базы данных
+=======
+      POSTGRES_USER: nikita        
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: library_db        
+>>>>>>> 5ba0e59 (Исправления)
     ports:
-      - "5432:5432" # Стандартный порт PostgreSQL
+      - "5433:5432" # Стандартный порт PostgreSQL
     volumes:
       - pgdata:/var/lib/postgresql/data # Правильный путь для сохранения данных Postgres
+    networks:         
+      - custom_net    
 
-  lybary:
+  library:
     build: .
-    image: necrofus/lybary
+    image: necrofus/library
     depends_on:
       - db
     ports:
       - "8000:8000"
     env_file:
       - .env
+<<<<<<< HEAD
 
+=======
+    networks:         
+      - custom_net
+>>>>>>> 5ba0e59 (Исправления)
 volumes:
   pgdata: # Переименовали esdata1 во что-то более понятное
     driver: local
+networks:             
+  custom_net:         
+    driver: bridge    

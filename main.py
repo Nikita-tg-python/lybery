@@ -9,12 +9,16 @@ from register import reg
 
 
 class Setting(BaseSettings):
-    sql_url: str
+    key: str
+    db: str
+    postgres_password: str
 
     model_config = SettingsConfigDict(env_file=".env")
 
 
 setting = Setting()  # type: ignore
+
+engine = create_engine(setting.db)
 
 
 class BookBase(SQLModel):
@@ -31,9 +35,6 @@ class BookUpdate(SQLModel):
     book: str | None = None
     author: str | None = None
     language: str | None = None
-
-
-engine = create_engine(setting.sql_url)
 
 
 def create_db():
