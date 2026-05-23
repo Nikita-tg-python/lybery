@@ -4,15 +4,9 @@ services:
     container_name: library_db
     restart: always
     environment:
-<<<<<<< HEAD
-      POSTGRES_USER: nikita         # Замени на свой логин
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Замени на свой пароль
-      POSTGRES_DB: lybary_db        # Название твоей базы данных
-=======
       POSTGRES_USER: nikita        
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: library_db        
->>>>>>> 5ba0e59 (Исправления)
     ports:
       - "5433:5432" # Стандартный порт PostgreSQL
     volumes:
@@ -29,12 +23,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
-<<<<<<< HEAD
-
-=======
     networks:         
       - custom_net
->>>>>>> 5ba0e59 (Исправления)
 volumes:
   pgdata: # Переименовали esdata1 во что-то более понятное
     driver: local

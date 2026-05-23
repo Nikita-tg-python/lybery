@@ -8,7 +8,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Field, Session, SQLModel, select
+
+from app.database import SessionDep, engine
 
 
 class Setting(BaseSettings):
@@ -23,22 +25,12 @@ class Setting(BaseSettings):
 
 setting = Setting()  # type: ignore
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-password_hash = PasswordHash.recommended()
-
-DUMMY_HASH = password_hash.hash("dummypasword")
-
-engine = create_engine(setting.db)
-
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 password_hash = PasswordHash.recommended()
 
 DUMMY_HASH = password_hash.hash("dummypasword")
-
-engine = create_engine(setting.db)
 
 
 class User(SQLModel):
@@ -68,6 +60,11 @@ class SuperUser(UserInDB, table=True):
     superuser: bool | None = None
 
 
+class UserRegister(SQLModel):
+    username: str
+    password: str
+
+
 class Token(SQLModel):
     access_token: str
     token_type: str
@@ -79,14 +76,6 @@ class TokenData(SQLModel):
 
 def create_db():
     SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @asynccontextmanager
@@ -176,15 +165,15 @@ def login(
 
 
 @reg.post("/register", response_model=User)
-def register(username: str, user_password: str, session: SessionDep):
-    user_db = get_user(username=username, session=session)
+def register(user_data: UserRegister, session: SessionDep):
+    user_db = get_user(username=user_data.username, session=session)
     if user_db:
         raise HTTPException(status_code=409, detail="User already exists")
-    if len(user_password) < 6:
+    if len(user_data.password) < 6:
         raise HTTPException(status_code=400, detail="Password is too short")
-    hashed_password = hash_password(user_password)
+    hashed_password = hash_password(user_data.password)
     user = SuperUser(
-        username=username,
+        username=user_data.username,
         full_name=None,
         email=None,
         hashed_password=hashed_password,
@@ -197,24 +186,18 @@ def register(username: str, user_password: str, session: SessionDep):
     return user
 
 
-@reg.patch("/users/{username}")
+@reg.patch("/users/me")
 def user_rename(
-    username: str,
     user: UserUpdate,
-    user_db: Annotated[Librarian, Depends(get_current_user)],
+    user_db: Annotated[UserInDB, Depends(get_current_user)],
     session: SessionDep,
 ) -> User:
-    if not user_db.librarian:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    target_user = get_user(username=username, session=session)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="User not in db")
     update_user = user.model_dump(exclude_unset=True)
-    target_user.sqlmodel_update(update_user)
-    session.add(target_user)
+    user_db.sqlmodel_update(update_user)
+    session.add(user_db)
     session.commit()
-    session.refresh(target_user)
-    return target_user
+    session.refresh(user_db)
+    return user_db
 
 
 @reg.patch("/admin/librarians/{username}")
@@ -223,7 +206,7 @@ def librarians(
     user: Librarian,
     user_db: Annotated[SuperUser, Depends(get_current_user)],
     session: SessionDep,
-) -> User:
+) -> SuperUser:
     if not user_db.superuser:
         raise HTTPException(status_code=403, detail="Permission denied")
     target_user = get_user(username=username, session=session)
@@ -237,17 +220,12 @@ def librarians(
     return target_user
 
 
-@reg.patch("/user/password/{username}")
+@reg.patch("/users/password/me")
 def password(
-    username: str,
     user_password: Annotated[str, Body(..., embed=True)],
     user_db: Annotated[SuperUser, Depends(get_current_user)],
     session: SessionDep,
 ) -> User:
-    if user_db.username != username:
-        raise HTTPException(
-            status_code=403, detail="You can't change password other user"
-        )
     new_hashed_paswword = hash_password(user_password)
     user_db.hashed_password = new_hashed_paswword
     session.add(user_db)
